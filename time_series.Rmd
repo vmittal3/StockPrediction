@@ -1,0 +1,201 @@
+---
+title: "DSc Assignment 3"
+author: "Vaibhav Mittal"
+date: "24 October 2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Time Series Analysis
+
+Submitted by Vaibhav Mittal, MT18242.
+
+# Question 1
+```{r}
+setwd("E:/College/Sem3/DSc/Assign3/")
+```
+Question: ![TimeSeries](E:\\College\\Sem3\\DSc\\Assign3\\TimeSeriesQues.JPG)
+
+$a$ cannot be considered stationary since the mean is changing. $b$ can be considered stationary $iff$ outliers aren't considered. Because of some instances of changing covariances, $b$ isn't stationary. $c$ isn't stationary.
+
+$d$ isn't stationary. It has some oscillatory behaviour too. $e$ isn't stationary due to changing mean. $f$ isn't stationary too due to the same reasons.
+
+$g$ seems stationary albeit it has some outliers. $h$ is a bit less stationary since it has more outliers. There are some covariance changes too. $f$ is not at all stationary.
+
+# Question 2
+
+```{r}
+library(quantmod)
+getSymbols(c('AMZN', 'MSFT', 'GOOG'), src = 'yahoo', from = '2016-10-01')
+
+```
+
+We won't go into Bollinger Bang charts and will only plot their adjusted time series.
+
+```{r}
+plot(AMZN[,6])
+plot(GOOG[,6])
+plot(MSFT[,6])
+```
+
+**All the stocks seem healthy in the fact that their means show an increasing trend.**  
+
+```{r}
+amazon = c(AMZN[,6])
+google = c(GOOG[,6])
+microsoft = c(MSFT[,6])
+
+amazon_1 = rep(0, length(amazon))
+amazon_1[1:(length(amazon)-1)] = c(amazon[2:length(amazon)])
+amazon_2 = rep(0, length(amazon))
+amazon_2[1:(length(amazon)-2)] = c(amazon[3:length(amazon)])
+amazon_3 = rep(0, length(amazon))
+amazon_3[1:(length(amazon)-3)] = c(amazon[4:length(amazon)])
+#plot(x_t, x_t_1)
+cor(amazon, amazon_1)
+cor(amazon, amazon_2)
+cor(amazon, amazon_3)
+
+```
+
+```{r}
+google_1 = rep(0, (length(google)-1))
+google_1[1:(length(google)-1)] = c(google[1:(length(google)-1)])
+cor(x = as.vector(google[2:772]), y = google_1)
+cor(google[3:772], google[1:770])
+cor(google[4:772], google[1:769])
+```
+
+```{r}
+cor(microsoft[2:772], microsoft[1:771])
+cor(microsoft[3:772], microsoft[1:770])
+cor(microsoft[4:772], microsoft[1:769])
+```
+
+All of them seem very positively autocorrelated. This was checked with 1-lag, 2-lag, and 3-lag.
+
+```{r}
+hist(as.vector(google))
+hist(as.vector(microsoft))
+hist(as.vector(amazon))
+```
+
+If the data had been stationary, we'd have seen consistent frequency histograms. Looking at the time series plot itself, we can easily infer that the mean is changing and they aren't stationary. Making a 50-50 split of the data will return different mean and variances.
+
+```{r}
+library(forecast)
+library(tseries)
+
+ggAcf(google)
+ggAcf(microsoft)
+ggAcf(amazon)
+
+fcast = forecast(auto.arima(as.numeric(google)[1:617]), h = 155, level = c(95))
+plot(fcast)
+```
+
+It can be seen that the model isn't very good. We should smoothen the time series by the taking differences.
+
+```{r}
+google_diff1 = rep(0, length(google)-1)
+google_diff1 = as.vector(google)[2:772] - google[1:771]
+fcast = forecast(auto.arima(as.numeric(google)[1:617]), h = 155, level = c(95))
+plot(fcast)
+```
+
+```{r}
+fit_google = forecast(Arima(google[1:617], order = c(2,3,2)), h = 155, level = c(50))
+plot(fit_google, ylim = c(700,2500), xlim = c(0,800))
+par(new = T)
+plot(as.vector(google), ylim = c(700,2500), xlim = c(0,800), xlab="", ylab="", main="", col="red", type = "l")
+```
+
+Both predictions on the Google stock have a high variability. The first fit seems better since it relates to the actual data much better. Doing the same analysis on different stocks.
+
+```{r}
+fit_msft = forecast(Arima(microsoft[1:617], order = c(2,3,2)), h = 155, level = c(50))
+plot(fit_msft, ylim = c(50, 160), xlim = c(0,800))
+par(new = T)
+plot(as.vector(microsoft), ylim = c(50,160), xlim = c(0,800), xlab="", ylab="", main="", col="red", type = "l")
+```
+
+Microsoft's stock is predicted much better! Now for Amazon $:-$
+
+```{r}
+fit_amzn = forecast(Arima(amazon[1:617], order = c(2,3,2)), h = 155, level = c(50))
+plot(fit_amzn, xlim = c(0,800), ylim = c(800, 4300))
+par(new = T)
+plot(as.vector(amazon), ylim = c(800,4300), xlim = c(0,800), xlab="", ylab="", main="", col="red", type = "l")
+```
+
+Microsoft's stock was predicted the best with the least variance seen due to the confidence intervals. Amazon's was still not predicted very well when we check the actual data.
+
+# Question 3
+
+```{r}
+library(mlbench)
+data("BreastCancer")
+library(superml)
+library(MASS)
+```
+
+Viewing the dataframe, we see that the Id column is a character column. All other are categorical variables encoded as numbers. 
+
+```{r}
+BreastCancer$Id = as.numeric(BreastCancer$Id)
+lbl = superml::LabelEncoder$new()
+BreastCancer$Class = lbl$fit_transform(BreastCancer$Class)
+
+```
+
+This encoding converts 'benign' to '0' and 'malignant' to '1' (retains the column as a factor).
+
+Let's check for Spearman correlation with the dependent variables. We may very well discard the column $Id$.
+
+```{r}
+cor(data.matrix(BreastCancer), method = 'spearman')
+```
+
+$Cell.size$ and $Cell.shape$ show very good correlations ($\rho > 0.8$). $Bare.nuclei$ contains some NAs. Let's remove them and check the correlation. 
+
+```{r}
+cor(data.matrix(BreastCancer), method = 'spearman')
+```
+
+$\rho = 0.74$ for $bare.nuclei$.
+
+Now, since the response variable is a binary variable, we'll use the binomial distribution as the link function.
+
+```{r}
+for (i in 1:11){
+  BreastCancer[,i] = as.numeric(BreastCancer[,i])
+}
+
+BreastCancer = na.omit(BreastCancer)
+
+```
+
+```{r}
+model = stats::glm(Class ~ . , data = BreastCancer,  family = binomial(link = "logit"), control = list(maxit = 100))
+summary(model)
+```
+
+The statistics displayed by the $stats::glm$ function displays $:-$
+
+1. **Call** - What actual command was given to generate the generalised linear model.
+2. **Deviance Residuals** - Gives the summary of the deviance residuals - their minimum value, 25th, 50th, and 75th percentile, and the maximum value.
+3. **Coefficients** - These are the coefficients (or slopes) given to the different independent variables. Note the significance codes below. Our data has the intercept, Cl.thickness, Marg.adhesion, Bare.nuclei, Bl.cromatin as signinficant variables. These coefficients are actually in units of logit. These are log of odd ratios. 
+4. **Null and Residual deviance** - The null model (containing random values) had a deviance of $884.35$ on $682$ degrees of freedom. The residual deviance could bring it down to $102.90$ --- a significant drop with a reduction to $672$ degrees of freedom. Lesser this deviance, better the fit.
+5. ***AIC** - The Akaike Information Criteria or AIC is $124.9$. This model can be compared with other such models on the basis of complexity with this measure.
+6. **Number of Fisher Scoring Iterations** - The maximum iterations were given to be $100$. This number tells us that the model was itself able to converge (using Newton's approximation method) with $8$ iterations.
+
+
+```{r}
+exp(cbind(coef(model), confint(model, level = 0.95)))
+```
+
+The warnings displayed is due to the fact of 'perfect distinguishability', i.e., the data is very able to separate the benign and malignant cases. This gives us exact 0 or 1 probabilities in two cases. The odds discussed earlier were in logit units or log odd ratios, so we exponentiate them. They give us $95\%$ confidence intervals ($2.5\%$ on both sides). Here we see that all the variables are positively correlated with our target variable - meaning as they increase from the discrete $0$ towards $10$, the target variable increases from $0$ to $1$ (benign to malignant). The biggest odd ratios are seen in $Cell.size$ and the intercept. This means that $Cell.size$ dominates the prediction towards benign or malignancy. All other have a near about coefficient of $1$ (although the confidence interval seems too high) so they are being used as additives in the model.
+
